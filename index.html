@@ -27,11 +27,11 @@
 </head>
 <body>
 <div id="wrap"><canvas id="c"></canvas></div>
-<div id="vstamp">v1</div>
+<div id="vstamp">v2</div>
 <script>
 /* Portal: none (itch.io / standalone).
    Sin SDK: el juego corre con localStorage y sin anuncios. */
-/* SCREW SORT BUILD v1 */
+/* SCREW SORT BUILD v2 */
 </script>
 <script>
 "use strict";
@@ -1208,7 +1208,7 @@ function drawTitle(){
   ui.play=button(140,500,200,64,"PLAY",null,"#22c55e");
   ui.muteT=circleBtn(440,30,19,Game.muted?"✕":"♪","#475569");
   ctx.fillStyle="#64748b"; ctx.font=font(500,13);
-  ctx.fillText("Robot Lab • v"+"v1",240,620);
+  ctx.fillText("Robot Lab • v"+"v2",240,620);
 }
 
 function drawSelect(){
@@ -1468,14 +1468,36 @@ function frame(t){
     if(frames===2){ try{ Portal.gameReady(); }catch(e){} }
   }catch(e){}
 }
+function applyProgress(v,merge){
+  var coins=parseInt(v[0]||"0",10)||0,
+      unlocked=parseInt(v[1]||"1",10)||1,
+      completions=parseInt(v[5]||"0",10)||0, stars={};
+  try{ stars=JSON.parse(v[2]||"{}"); }catch(e){ stars={}; }
+  if(merge){
+    /* Fusión conservadora: nunca se pierde progreso ganado en esta sesión. */
+    if(coins>Game.coins) Game.coins=coins;
+    if(unlocked>Game.unlocked) Game.unlocked=unlocked;
+    if(completions>Game.completions) Game.completions=completions;
+    for(var k in stars){ if(stars.hasOwnProperty(k)&&(!Game.stars[k]||stars[k]>Game.stars[k])) Game.stars[k]=stars[k]; }
+    if(v[3]==="1"){ Game.muted=true; Sfx.muted=true; }
+    if(v[4]==="1") Game.seenTut=true;
+  }else{
+    Game.coins=coins; Game.unlocked=unlocked; Game.stars=stars;
+    Game.muted=v[3]==="1"; Sfx.muted=Game.muted;
+    Game.seenTut=v[4]==="1"; Game.completions=completions;
+  }
+}
+/* Re-lee el progreso con el Store activo. Los adaptadores de portal con
+   storage async (Playgama) lo llaman cuando su SDK queda listo DESPUÉS
+   del boot, porque el boot leyó el Store anterior (localStorage). */
+window.__reapplyProgress=function(){
+  return Promise.all([Store.get("coins"),Store.get("unlocked"),Store.get("stars"),
+    Store.get("muted"),Store.get("seenTut"),Store.get("completions")])
+    .then(function(v){ applyProgress(v,true); }).catch(function(){});
+};
 Promise.all([Store.get("coins"),Store.get("unlocked"),Store.get("stars"),
              Store.get("muted"),Store.get("seenTut"),Store.get("completions")]).then(v=>{
-  Game.coins=parseInt(v[0]||"0",10)||0;
-  Game.unlocked=parseInt(v[1]||"1",10)||1;
-  try{ Game.stars=JSON.parse(v[2]||"{}"); }catch(e){ Game.stars={}; }
-  Game.muted=v[3]==="1"; Sfx.muted=Game.muted;
-  Game.seenTut=v[4]==="1";
-  Game.completions=parseInt(v[5]||"0",10)||0;
+  applyProgress(v,false);
   try{ Portal.boot(); }catch(e){}
   try{
     const q=new URLSearchParams(location.search);
@@ -1492,7 +1514,7 @@ Promise.all([Store.get("coins"),Store.get("unlocked"),Store.get("stars"),
 
 /* ================= TEST HOOKS ================= */
 window.__SCREW_TEST__={
-  version:"v1",
+  version:"v2",
   state(){
     const L=Game.L;
     return {
