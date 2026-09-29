@@ -14,7 +14,7 @@
 <meta name="twitter:title" content="Screw Sort: Robot Workshop">
 <meta name="twitter:description" content="Unscrew colorful robot bolts and sort them into bins! A satisfying ASMR puzzle. Play free!">
 <meta name="twitter:image" content="https://snake58.github.io/screw-sort-robot-workshop/og-image.jpg">
-
+<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body { width:100%; height:100%; overflow:hidden; background:#141a2e;
@@ -29,8 +29,62 @@
 <div id="wrap"><canvas id="c"></canvas></div>
 <div id="vstamp">v2</div>
 <script>
-/* Portal: none (itch.io / standalone).
-   Sin SDK: el juego corre con localStorage y sin anuncios. */
+/* Portal: CrazyGames SDK v3 — https://docs.crazygames.com/
+   Reglas aplicadas: init con await antes que todo; gameplayStart con el primer
+   input (no al cargar); gameplayStop antes de pedir un ad; mute+pausa en
+   adStarted; reanudar en adFinished/adError; respetar settings.muteAudio;
+   sin botón de fullscreen propio (el juego no tiene); física con timestep
+   fijo (substeps en physStep); todo en inglés. */
+window.Portal = (function () {
+  var ready = false;
+  function platformMuted(){
+    try { return !!(window.CrazyGames && window.CrazyGames.SDK.game.settings.muteAudio); }
+    catch (e) { return false; }
+  }
+  function applyMute(){ try { Sfx.setMuted(platformMuted()); } catch (e) {} }
+  function sdk(){ return window.CrazyGames.SDK; }
+  return {
+    name: "crazygames",
+  rewarded:false,
+    boot(){
+      try {
+        sdk().init().then(function (){
+          ready = true;
+          applyMute();
+          try {
+            if (sdk().game.addSettingsChangeListener)
+              sdk().game.addSettingsChangeListener(applyMute);
+          } catch (e) {}
+        }).catch(function (){});
+      } catch (e) {}
+    },
+    gameReady(){},
+    gameplayStart(){ try { if (ready) sdk().game.gameplayStart(); } catch (e) {} },
+    gameplayStop(){ try { if (ready) sdk().game.gameplayStop(); } catch (e) {} },
+    scoreChanged(s){},
+  showRewarded(cb){ try{cb(false);}catch(e){} },
+    interstitial(){ try{ return this.showInterstitial(); }catch(e){} },
+    showInterstitial(){
+      var self = this;
+      self.gameplayStop();
+      Game.autoPause(true); Sfx.setMuted(true);
+      var done = function (){
+        Sfx.setMuted(false); applyMute(); Game.autoPause(false);
+      };
+      try {
+        if (ready) {
+          sdk().ad.requestAd("midgame", {
+            adStarted: function (){ Sfx.setMuted(true); },
+            adFinished: done,
+            adError: done
+          });
+          // Seguridad: si los callbacks nunca llegan, reanudar a los 30s
+          setTimeout(function (){ if (Game.pausedByAd) done(); }, 30000);
+        } else done();
+      } catch (e) { done(); }
+    }
+  };
+})();
 /* SCREW SORT BUILD v2 */
 </script>
 <script>
